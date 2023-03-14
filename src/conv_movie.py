@@ -8,14 +8,14 @@ cwd = os.getcwd()
 
 
 def get_video_files(folder):
-    return os.listdir(folder)      
-  
+    return os.listdir(folder)
+
 def create_folder(folder):
     # create folder with video name
     path = os.path.join(cwd, output_folder, folder)
     if not os.path.exists(path):
         os.mkdir(path)
-        
+
     return path
 
 def capture_frames_from_video(video_name, video_folder):
@@ -29,10 +29,10 @@ def capture_frames_from_video(video_name, video_folder):
         frameNr += 1
         # print('frameNr', frameNr)
         success, frame = capture.read()
-        
+
         if not success:
             break
-    
+
         if frameNr % frame_rate == 0 or frameNr == 1:
             # print('writing fr', frameNr, frameNr % frame_rate)
             # cv2.imwrite(f'C:/Users/vlado/OneDrive/Desktop/Pic_zele/a_video_{frameNr}.jpg', frame)
@@ -40,8 +40,8 @@ def capture_frames_from_video(video_name, video_folder):
             cv2.imwrite(f'{video_folder}/{frameNr}.jpg', frame)
 
     capture.release()
-    print("-----------------------")    
-    
+    print("-----------------------")
+
 video_files = get_video_files('data/video')
 for video_file in video_files:
     video_folder = create_folder(video_file)
