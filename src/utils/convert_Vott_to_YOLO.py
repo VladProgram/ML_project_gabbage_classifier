@@ -1,13 +1,13 @@
 import json
 
 # Define the classes and output file name
-classes = ["cabbage", "weed"]
+classes = ["weed", "cabbage"]
 
 # Define path to Vott json file:
-vott_json_path = '../data/labeled_output/vott_labels.json'
+vott_json_path = '../../data/labeled_output/vott_labels.json'
 
 # Define path to YOLO output file:
-yolo_output_file = "../data/labeled_output/YOLO_labels.txt"
+yolo_output_file = "../../data/labeled_output/YOLO_labels.txt"
 
 # Load the JSON file
 with open(vott_json_path) as f:
