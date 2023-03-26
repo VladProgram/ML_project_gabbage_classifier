@@ -1,0 +1,1 @@
+python detect.py --weights C:\ML_cource\Project\models\best_150_ep.pt --img 640 --conf 0.70 --source data/my_video_12.avi
