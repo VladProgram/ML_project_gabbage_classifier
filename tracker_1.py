@@ -6,7 +6,7 @@ from yolov5.utils.general import non_max_suppression
 # Load YOLOv5 model
 weights = r'C:\ML_cource\Project\models\best_200_ep.pt'
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-model = attempt_load(weights, map_location=device)
+model = attempt_load(weights, device=device)
 
 # Define class labels
 class_labels = ['cabbage', 'weed']
@@ -121,9 +121,12 @@ while cap.isOpened():
 
     # Display the frame with tracked objects
     cv2.imshow('Frame', frame)
+    
+    
+    print(f'Tracker: {tracker}')
 
     if cv2.waitKey(1) & 0xFF == 27:  # Press 'Esc' to exit
         break
 
 cap.release()
-cv2.destroyAllWindows()
+# cv2.destroyAllWindows()
