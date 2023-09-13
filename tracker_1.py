@@ -1,5 +1,6 @@
 import cv2
 import torch
+import numpy as np
 from yolov5.models.experimental import attempt_load
 from yolov5.utils.general import non_max_suppression
 
@@ -14,48 +15,65 @@ class_labels = ['cabbage', 'weed']
 # Initialize SORT tracker
 class SortTracker:
     def __init__(self):
-        self.next_id = 1
+        self.next_id = {}
+        self.next_id['weed'] = 1
+        self.next_id['cabbage'] = 1
+
         self.tracks = {}
+        self.tracks['weed'] = {}
+        self.tracks['cabbage'] = {}
 
     def update(self, detections):
+        tracked_objects = {}
         # Update existing tracks with new detections
-        for track_id, track in self.tracks.items():
-            if track['time_since_update'] > 0:
-                track['time_since_update'] -= 1
+        for i in class_labels:
+            for track_id, track in self.tracks[i].items():
+                if track['time_since_update'] > 0:
+                    track['time_since_update'] -= 1
+            time_update = 0
+            for detection in detections:
+                x_min, y_min, x_max, y_max, conf, cls_id = detection
+                cls_name = class_labels[int(cls_id)]
+                best_match_id = None
+                best_iou = 0
+                
+                for track_id, track in self.tracks[cls_name].items():
+                    if track['time_since_update'] == 0:
+                        track_box = track['box']
+                        iou = self.compute_iou((x_min, y_min, x_max, y_max), track_box)
+                        if iou > best_iou:
+                            best_iou = iou
+                            best_match_id = track_id
+                
+                if best_match_id is not None and best_iou > 0.3: #defoult=0.5
+                    self.tracks[cls_name][best_match_id]['box'] = (x_min, y_min, x_max, y_max)
+                    self.tracks[cls_name][best_match_id]['time_since_update'] = 0
+                else:
+                    self.tracks[cls_name][self.next_id[cls_name]] = {
+                        'box': (x_min, y_min, x_max, y_max),
+                        'time_since_update': time_update,
+                        'class': cls_name
+                    }
+                    # self.tracks[cls_name][track_id]['box'] = (x_min, y_min, x_max, y_max)
+                    # self.tracks[cls_name][track_id]['time_since_update'] += 1
+                    # self.tracks[cls_name][track_id]['class'] = cls_name
+                    self.next_id[cls_name] += 1
+                    time_update +=1
+                    # print('time_update', time_update)
+            # print('track_time_since_update', track['time_since_update'])
 
-        for detection in detections:
-            x_min, y_min, x_max, y_max, conf, cls_id = detection
-            cls_name = class_labels[int(cls_id)]
-            best_match_id = None
-            best_iou = 0
+            # Remove old tracks
+                self.tracks[i] = {track_id: track for track_id, track in self.tracks[i].items()
+                                if track['time_since_update'] < 1}  #default=10
+                # self.tracks[i] = {}
+                # for track_id, track in self.tracks[i].items():
+                #     if track['time_since_update'] < 3:
+                #         self.tracks[i][track_id] = track
+                # Get tracked objects for visualization
 
-            for track_id, track in self.tracks.items():
-                if track['time_since_update'] == 0:
-                    track_box = track['box']
-                    iou = self.compute_iou((x_min, y_min, x_max, y_max), track_box)
-                    if iou > best_iou:
-                        best_iou = iou
-                        best_match_id = track_id
-
-            if best_match_id is not None and best_iou > 0.5:
-                self.tracks[best_match_id]['box'] = (x_min, y_min, x_max, y_max)
-                self.tracks[best_match_id]['time_since_update'] = 0
-            else:
-                self.tracks[self.next_id] = {
-                    'box': (x_min, y_min, x_max, y_max),
-                    'time_since_update': 0,
-                    'class': cls_name
-                }
-                self.next_id += 1
-
-        # Remove old tracks
-        self.tracks = {track_id: track for track_id, track in self.tracks.items()
-                       if track['time_since_update'] < 10}
-
-        # Get tracked objects for visualization
-        tracked_objects = []
-        for track_id, track in self.tracks.items():
-            tracked_objects.append(track['box'] + (track_id, track['class']))
+            tracked_objects[i] = []
+            for track_id, track in self.tracks[i].items():
+                tracked_objects[i].append(track['box'] + (track_id, track['class']))
 
         return tracked_objects
 
@@ -85,7 +103,7 @@ tracker = SortTracker()
 # Open the video file
 video_path = r'C:\Users\vlado\OneDrive\Desktop\my_video_12.mp4'
 cap = cv2.VideoCapture(video_path)
-
+# blank_frame = np.zeros_like(frame)
 while cap.isOpened():
     ret, frame = cap.read()
     if not ret:
@@ -111,22 +129,31 @@ while cap.isOpened():
     if len(detections) > 0:
         tracked_objects = tracker.update(detections)
 
-        # Draw bounding boxes and labels on the frame
-        for obj in tracked_objects:
-            x_min, y_min, x_max, y_max, track_id, cls_name = obj
-            x_min, y_min, x_max, y_max = int(x_min), int(y_min), int(x_max), int(y_max)
-            cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
-            cv2.putText(frame, f"{cls_name} {track_id}", (x_min, y_min - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        for i in class_labels:
+            # Draw bounding boxes and labels on the frame
+            for obj in tracked_objects[i]:
+                x_min, y_min, x_max, y_max, track_id, cls_name = obj
+                x_min, y_min, x_max, y_max = int(x_min), int(y_min), int(x_max), int(y_max)
+                if i == 'cabbage':
+                    cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2)
+                    cv2.putText(frame, f"{cls_name} {track_id}", (x_min, y_min - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                else:
+                    cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 0, 255), 2)
+                    cv2.putText(frame, f"{cls_name} {track_id}", (x_min, y_min - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)                
 
     # Display the frame with tracked objects
+      
+    
     cv2.imshow('Frame', frame)
     
     
     print(f'Tracker: {tracker}')
 
-    if cv2.waitKey(1) & 0xFF == 27:  # Press 'Esc' to exit
+    if cv2.waitKey(1) & 0xFF == 1027:  # Press 'Esc' to exit
         break
 
 cap.release()
-# cv2.destroyAllWindows()
+
+cv2.destroyAllWindows()
